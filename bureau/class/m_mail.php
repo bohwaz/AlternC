@@ -549,6 +549,7 @@ ORDER BY
             $db->query("DELETE FROM address WHERE id= ? ;", array($mail_id));
             $db->query("DELETE FROM mailbox WHERE address_id= ? ;", array($mail_id));
             $db->query("DELETE FROM recipient WHERE address_id= ? ;", array($mail_id));
+            $db->query("DELETE FROM mail_webhooks WHERE address_id= ? ;", array($mail_id));
         }
         return true;
     }
