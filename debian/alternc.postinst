@@ -52,12 +52,12 @@ case "$1" in
        addgroup --gid 1998 vmail
     fi
     if ! getent passwd vmail; then
-       useradd -g vmail -u 1998 vmail -d "$VMAIL_HOME" -m 
-    fi 
+       useradd -g vmail -u 1998 vmail -d "$VMAIL_HOME" -m
+    fi
     test -d "$VMAIL_HOME" || mkdir -p "$VMAIL_HOME"
-    chown vmail:vmail "$VMAIL_HOME" 
+    chown vmail:vmail "$VMAIL_HOME"
     chown vmail:vmail "$VMAIL_HOME"/* 2>/dev/null || true # It may be empty
-    chmod 770 "$VMAIL_HOME" 
+    chmod 770 "$VMAIL_HOME"
     chmod 770 "$VMAIL_HOME"/* 2>/dev/null || true # It may be empty
 
     # build local.sh if it does not exist
@@ -134,6 +134,19 @@ ALTERNC_LOGS=""
 # called from the panel. To enable quota-over-NFS, put yes here
 NFS_QUOTA=no
 
+# How long do we wait before compressing the log
+# default is 2
+LOGS_COMPRESS_DAYS=2
+
+# How many day do we keep the logs?
+# defautl is 366 day
+LOGS_DELETE_DAYS=366
+
+# Apache2 behavior
+APACHE_SSL_DISABLED=no
+APACHE_PORT_HTTP=80
+APACHE_PORT_HTTPS=443
+
 EOF
 
         chown root:alterncpanel $CONFIGFILE
@@ -149,21 +162,23 @@ EOF
     # SED_SCRIPT will be modified by update_var
     SED_SCRIPT=""
     update_var alternc/hostingname HOSTING
-    update_var alternc/desktopname FQDN 
+    update_var alternc/desktopname FQDN
     update_var alternc/public_ip PUBLIC_IP
     update_var alternc/internal_ip INTERNAL_IP
     update_var alternc/monitor_ip MONITOR_IP
     update_var alternc/ns1 NS1_HOSTNAME
     update_var alternc/ns2 NS2_HOSTNAME
-    update_var alternc/default_mx DEFAULT_MX 
+    update_var alternc/default_mx DEFAULT_MX
     update_var alternc/default_mx2 DEFAULT_SECONDARY_MX
-    update_var alternc/mysql/client MYSQL_CLIENT 
+    update_var alternc/mysql/client MYSQL_CLIENT
     update_var alternc/sql/backup_type SQLBACKUP_TYPE
     update_var alternc/sql/backup_overwrite SQLBACKUP_OVERWRITE
     update_var alternc/slaves ALTERNC_SLAVES
     update_var alternc/alternc_html ALTERNC_HTML
     update_var alternc/alternc_mail ALTERNC_MAIL
     update_var alternc/alternc_logs ALTERNC_LOGS
+    update_var alternc/proftpd_sftp_enabled PROFTPD_SFTP_ENABLED
+    update_var alternc/proftpd_sftp_port  PROFTPD_SFTP_PORT
     sed -e "$SED_SCRIPT" < $CONFIGFILE > $CONFIGFILE.tmp
     mv -f $CONFIGFILE.tmp $CONFIGFILE
 
@@ -173,6 +188,38 @@ EOF
 # the default is NO, since this dramatically block /usr/lib/alternc/quota* functions
 # called from the panel. To enable quota-over-NFS, put yes here
 NFS_QUOTA=no" >> $CONFIGFILE
+
+    # Add LOGS_COMPRESS_DAYS
+    grep -Eq "^ *LOGS_COMPRESS_DAYS=" $CONFIGFILE || echo "
+# How long do we wait before compressing the log
+# default is 2
+LOGS_COMPRESS_DAYS=2" >> $CONFIGFILE
+
+    # Add LOGS_DELETE_DAYS
+    grep -Eq "^ *LOGS_DELETE_DAYS=" $CONFIGFILE || echo "
+# How many day do we keep the logs?
+# defautl is 366 day
+LOGS_DELETE_DAYS=366" >> $CONFIGFILE
+
+    # Add APACHE2 configuration:
+    grep -Eq "^ *APACHE_SSL_DISABLED=" $CONFIGFILE || echo "
+APACHE_SSL_DISABLED=no" >> $CONFIGFILE
+    grep -Eq "^ *APACHE_PORT_HTTP=" $CONFIGFILE || echo "
+APACHE_PORT_HTTP=80" >> $CONFIGFILE
+    grep -Eq "^ *APACHE_PORT_HTTPS=" $CONFIGFILE || echo "
+APACHE_PORT_HTTPS=443" >> $CONFIGFILE
+
+    # Add SFTP support
+    grep -Eq "^ *PROFTPD_SFTP_ENABLED=" $CONFIGFILE || echo "
+PROFTPD_SFTP_ENABLED=off" >> $CONFIGFILE
+    grep -Eq "^ *PROFTPD_SFTP_PORT=" $CONFIGFILE || echo "
+PROFTPD_SFTP_PORT=2222" >> $CONFIGFILE
+
+    # Enabled DNESEC
+    grep -Eq "^ *DNSSEC_ENABLED=" $CONFIGFILE || echo "
+#Enable DNSSEC
+#Require bind >= 9.16 (enable with caution could break with buster) 
+DNSSEC_ENABLED=off" >> $CONFIGFILE
 
     # Erase all apacheconf file
     # They will be regenerated without the bug by upgrade_check.sh below.
@@ -252,6 +299,8 @@ NFS_QUOTA=no" >> $CONFIGFILE
     touch           /var/lib/alternc/bind/automatic.conf /var/lib/alternc/bind/slaveip.conf
     chown root:bind /var/lib/alternc/bind/automatic.conf /var/lib/alternc/bind/slaveip.conf
     chmod 640       /var/lib/alternc/bind/automatic.conf /var/lib/alternc/bind/slaveip.conf
+    chown root:bind /var/lib/alternc/bind/zones/
+    chmod 775       /var/lib/alternc/bind/zones/
     mkdir -p /run/alternc && chown alterncpanel:alterncpanel /run/alternc
     # Bind Apparmor Override, required by default on >= Buster
     if [ -f '/etc/apparmor.d/usr.sbin.named' ] ; then
@@ -270,7 +319,7 @@ NFS_QUOTA=no" >> $CONFIGFILE
 
         # Reload the profile, including any abstraction updates
         if aa-enabled --quiet 2>/dev/null; then
-            apparmor_parser -r -T -W "usr.sbin.named" || true
+            apparmor_parser -r -T -W /etc/apparmor.d/usr.sbin.named || true
         fi
     fi
     mkdir -p /run/alternc/incron && chown alterncpanel:alterncpanel /run/alternc/incron

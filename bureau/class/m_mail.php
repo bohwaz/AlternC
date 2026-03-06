@@ -70,7 +70,7 @@ class m_mail {
     /**
      * Constructeur
      */
-    function m_mail() {
+    function __construct() {
         global $L_FQDN;
         $this->srv_postfix = variable_get('fqdn_postfix', $L_FQDN, 'FQDN name for humans for smtp services. If you change it, launch reload-certs', array('desc' => 'Name', 'type' => 'string'));
         $this->srv_dovecot = variable_get('fqdn_dovecot', $L_FQDN, 'FQDN name for humans for pop/imap services. If you change it, launch reload-certs', array('desc' => 'Name', 'type' => 'string'));
@@ -546,10 +546,10 @@ ORDER BY
             $db->query("UPDATE mailbox SET mail_action='DELETE' WHERE address_id= ?;", array($mail_id));
         } else {
             // If it's only aliases, delete it NOW.
-            $db->query("DELETE FROM address WHERE id= ? ;", array($mail_id));
-            $db->query("DELETE FROM mailbox WHERE address_id= ? ;", array($mail_id));
             $db->query("DELETE FROM recipient WHERE address_id= ? ;", array($mail_id));
             $db->query("DELETE FROM mail_webhooks WHERE address_id= ? ;", array($mail_id));
+            $db->query("DELETE FROM mailbox WHERE address_id= ? ;", array($mail_id));
+            $db->query("DELETE FROM address WHERE id= ? ;", array($mail_id));
         }
         return true;
     }
@@ -835,7 +835,7 @@ ORDER BY
             $str.="  <domain>\n    <name>" . xml_entities($d["domain"]) . "</name>\n";
             $s = $this->enum_domain_mails($d["id"]);
             if (count($s)) {
-                while (list($key, $val) = each($s)) {
+                foreach($s as $key=>$val) {
                     $str.="    <address>\n";
                     $str.="      <name>" . xml_entities($val["address"]) . "</name>\n";
                     $str.="      <enabled>" . xml_entities($val["enabled"]) . "</enabled>\n";

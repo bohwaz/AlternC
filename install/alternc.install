@@ -116,7 +116,7 @@ TEMPLATE_DIR="/etc/alternc/templates"
 
 # Find needed configuration files (without the initial '/')
 # replace this one unconditionnally
-CONFIG_FILES="etc/alternc/bureau.conf etc/apache2/envvars etc/alternc/apache2.conf etc/alternc/phpmyadmin.inc.php"
+CONFIG_FILES="etc/alternc/bureau.conf etc/apache2/envvars etc/alternc/apache2.conf etc/alternc/phpmyadmin.inc.php etc/apache2/mods-available/ssl.conf etc/apache2/conf-available/alternc-ssl.conf"
 
 if [ -e /etc/bind/named.conf ]; then
     CONFIG_FILES="$CONFIG_FILES etc/bind/named.conf.options"
@@ -129,7 +129,7 @@ if [ -d /etc/postfix ]; then
                   etc/opendkim.conf etc/default/opendkim"
 fi
 if [ -e /etc/proftpd/proftpd.conf ]; then
-    CONFIG_FILES="$CONFIG_FILES etc/proftpd/proftpd.conf etc/proftpd/welcome.msg etc/proftpd/modules.conf"
+    CONFIG_FILES="$CONFIG_FILES etc/proftpd/proftpd.conf etc/proftpd/welcome.msg etc/proftpd/modules.conf etc/proftpd/conf.d/sftp.conf"
 fi
 
 if [ -e /etc/default/saslauthd ]; then
@@ -270,6 +270,12 @@ MYSQL_MAIL_PASS_ORIG="$MYSQL_MAIL_PASS"
 MYSQL_MAIL_PASS=$(echo "$MYSQL_MAIL_PASS" | sed -e 's/[|&]/\\&/g')
 PHPMYADMIN_BLOWFISH_ORIG="$PHPMYADMIN_BLOWFISH_ORIG"
 PHPMYADMIN_BLOWFISH=$(echo "$PHPMYADMIN_BLOWFISH" | sed -e 's/[|&]/\\&/g')
+if [ "$PROFTPD_SFTP_ENABLED" != "on" ]; then
+    PROFTPD_SFTP_ENABLED="off"
+fi
+if [[ ! "$PROFTPD_SFTP_PORT" -gt 0 ]]; then
+    PROFTPD_SFTP_PORT="2222"
+fi
 cat > $SED_SCRIPT <<EOF
 s\\%%hosting%%\\$HOSTING\\;
 s\\%%fqdn%%\\$FQDN\\;
@@ -293,7 +299,11 @@ s\\%%ns2_ip%%\\$NS2_IP\\;
 s\\%%ALTERNC_HTML%%\\$ALTERNC_HTML\\;
 s\\%%ALTERNC_MAIL%%\\$ALTERNC_MAIL\\;
 s\\%%ALTERNC_LOGS%%\\$ALTERNC_LOGS\\;
+s\\%%APACHE_PORT_HTTP%%\\$APACHE_PORT_HTTP\\;
+s\\%%APACHE_PORT_HTTPS%%\\$APACHE_PORT_HTTPS\\;
 s|%%PHPMYADMIN_BLOWFISH%%|$PHPMYADMIN_BLOWFISH|;
+s\\%%PROFTPD_SFTP_ENABLED%%\\$PROFTPD_SFTP_ENABLED\\;
+s\\%%PROFTPD_SFTP_PORT%%\\$PROFTPD_SFTP_PORT\\;
 EOF
 MYSQL_PASS="$MYSQL_PASS_ORIG"
 MYSQL_MAIL_PASS="$MYSQL_MAIL_PASS_ORIG"
@@ -408,6 +418,7 @@ if [ -x /usr/sbin/apache2 ]; then
     fi 
     if ! [ -L /etc/apache2/mods-enabled/php$php.load ]
     then
+        a2dismod php*
 	a2enmod php$php
     fi
     if ! [ -L /etc/apache2/mods-enabled/rewrite.load ]
@@ -418,13 +429,14 @@ if [ -x /usr/sbin/apache2 ]; then
     then
 	a2enmod expires
     fi
-    if ! [ -L /etc/apache2/mods-enabled/ssl.load ]
+    if [ "$APACHE_SSL_DISABLED" != "yes" ]
     then
-	a2enmod ssl
+        a2enmod ssl
+    else
+        a2dismod ssl
     fi
 
-    if [ ! -h /etc/apache2/conf-available/alternc-ssl.conf ] && [ -e /etc/apache2/conf-available/ ]; then
-        ln -sf /etc/alternc/apache2-ssl.conf /etc/apache2/conf-available/alternc-ssl.conf
+    if ! [ -L /etc/apache2/conf-enabled/alternc-ssl.conf ]; then
         a2enconf alternc-ssl
     fi
 
@@ -678,7 +690,7 @@ grep -q "^127.0.0.1\$" /etc/opendkim/TrustedHosts || echo "127.0.0.1" >>/etc/ope
 grep -q "^localhost\$" /etc/opendkim/TrustedHosts || echo "localhost" >>/etc/opendkim/TrustedHosts
 grep -q "^$PUBLIC_IP\$" /etc/opendkim/TrustedHosts || echo "$PUBLIC_IP" >>/etc/opendkim/TrustedHosts
 
-if [ "$SYSTEMD" = "1" -a "$(lsb_release -s -c)" = "stretch" ] ; then
+if [[ "$SYSTEMD" = "1" && ! "$(lsb_release -s -c)" =~ ^(jessie|wheezy)$ ]] ; then
     /lib/opendkim/opendkim.service.generate
     # Without adding '-u opendkim' after the service file is generated, opendkim
     # will run as root, which we do not want.
@@ -690,6 +702,24 @@ fi
 
 # Add opendkim to service to restart
 SERVICES="$SERVICES opendkim bind9"
+
+## Load DNS config
+if [[ ! -L  /var/lib/alternc/bind/automatic.conf ]]; then
+    #In first case we consider file always created without dnssec support
+    #If feature was tested before, manual correction should be done
+    mv /var/lib/alternc/bind/automatic.conf /var/lib/alternc/bind/automatic.simple.conf
+else
+    rm /var/lib/alternc/bind/automatic.conf
+fi
+
+touch /var/lib/alternc/bind/automatic.simple.conf || true
+touch /var/lib/alternc/bind/automatic.dnssec.conf || true
+
+if [[ "$DNSSEC_ENABLED" == "on" ]]; then
+    ln -s /var/lib/alternc/bind/automatic.dnssec.conf /var/lib/alternc/bind/automatic.conf
+else
+    ln -s /var/lib/alternc/bind/automatic.simple.conf /var/lib/alternc/bind/automatic.conf
+fi
 
 # hook 
 run-parts --arg=before-reload /usr/lib/alternc/install.d 

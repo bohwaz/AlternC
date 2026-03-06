@@ -91,8 +91,8 @@ CREATE TABLE IF NOT EXISTS chgmail (
 CREATE TABLE IF NOT EXISTS db (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   uid int(10) unsigned NOT NULL default '0',		-- Numéro de l`utilisateur
-  login varchar(16) NOT NULL default '',		-- Nom d`utilisateur mysql
-  pass varchar(16) NOT NULL default '',			-- Mot de passe mysql
+  login varchar(80) NOT NULL default '',		-- Nom d`utilisateur mysql
+  pass varchar(80) NOT NULL default '',			-- Mot de passe mysql
   db varchar(64) NOT NULL default '',			-- Base de données concernée
   bck_mode tinyint(3) unsigned NOT NULL default '0',	-- Mode de backup (0/non 1/Daily 2/Weekly)
   bck_history tinyint(3) unsigned NOT NULL default '0',	-- Nombre de backup à conserver ?
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS sub_domaines (
   enable enum ('ENABLED', 'ENABLE', 'DISABLED', 'DISABLE') NOT NULL DEFAULT 'ENABLED',
   `certificate_id` INT UNSIGNED NOT NULL DEFAULT '0',
   `provider` VARCHAR(16) NOT NULL DEFAULT '',
-  `https` VARCHAR(6) NOT NULL, -- SET(http,https,both) (also the suffix of the template name in /etc/alternc/templates/apache2/)
+  `https` VARCHAR(6) NOT NULL DEFAULT '', -- SET(http,https,both) (also the suffix of the template name in /etc/alternc/templates/apache2/)
   PRIMARY KEY (id)
 --  ,FOREIGN KEY (type) REFERENCES (domaines_type)
 ) ENGINE=InnoDB;
@@ -414,8 +414,8 @@ CREATE TABLE IF NOT EXISTS `variable` (
 CREATE TABLE IF NOT EXISTS `dbusers` (
   `id` int(10) unsigned NOT NULL auto_increment,
   `uid` int(10) unsigned NOT NULL default '0',
-  `name` varchar(16) NOT NULL default '',
-  `password`  varchar( 64 ),
+  `name` varchar(80) NOT NULL default '',
+  `password`  varchar( 80 ),
   `enable` enum ('ACTIVATED', 'HIDDEN', 'ADMIN') NOT NULL DEFAULT 'ACTIVATED', 
   KEY `id` (`id`)
 ) ENGINE=InnoDB COMMENT='Utilisateurs MySQL des membres';
@@ -487,27 +487,27 @@ CREATE TABLE IF NOT EXISTS `domaines_type` (
 ) ENGINE=InnoDB COMMENT = 'Type of domains allowed';
 
 INSERT IGNORE INTO `domaines_type` (name, description, target, entry, compatibility, only_dns, need_dns, advanced, enable,has_https_option) VALUES
-('dkim',  'DKIM Key',             'TXT', '%SUB% IN TXT "%TARGET%"',                 'txt,defmx,defmx2,mx,mx2,url,ip,ipv6',                   true,    true,    true, 'ADMIN', false),
-('autodiscover',  'Email autoconfiguration', 'NONE', '%SUB% IN A @@PUBLIC_IP@@', 'txt,defmx,defmx2,mx,mx2', false, true, true, 'ADMIN', false),
+('dkim',  'DKIM Key',             'TXT', '%SUB% IN TXT "%TARGET%"',                 'vhost,txt,defmx,defmx2,mx,mx2,url,ip,ipv6',                   true,    true,    true, 'ADMIN', false),
+('autodiscover',  'Email autoconfiguration', 'NONE', '%SUB% IN A @@PUBLIC_IP@@', 'txt,dkim,defmx,defmx2,mx,mx2', false, true, true, 'ADMIN', false),
 -- Default vhost type to maintains compatibility across versions.
 -- This is overloaded depending on the value of the https column in sub_domaines
-('vhost',      'Locally hosted',   'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',      'txt,defmx,defmx2,mx,mx2',                   false,    false,    false, 'ALL', true),
+('vhost',      'Locally hosted',   'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',      'txt,dkim,defmx,defmx2,mx,mx2',                   false,    false,    false, 'ALL', true),
 -- The following 3 types (vhost-http, vhost-https, vhost-both) are overloads for vhost
 -- and are "disabled" to not be available from the interface, but still be valid domaine types
 -- when checking in m_ssl::updateDomain.
-('vhost-http','Locally hosted with http->https',   'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',      'txt,defmx,defmx2,mx,mx2',                   false,    false,    false, 'NONE', false),
-('vhost-https','Locally hosted with http->https',   'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',      'txt,defmx,defmx2,mx,mx2',                   false,    false,    false, 'NONE', false),
-('vhost-both', 'Locally hosted with http and https', 'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',     'txt,defmx,defmx2,mx,mx2',                   false,    false,    false, 'NONE', false),
-('url',    'URL redirection',            'URL',       '%SUB% IN A @@PUBLIC_IP@@',                 'txt,defmx,defmx2,mx,mx2',                   false,    false,    false, 'ALL', false),
-('ip',     'IPv4 redirect',              'IP',        '%SUB% IN A %TARGET%',                      'url,ip,ipv6,txt,mx,mx2,defmx,defmx2',       true,     true,     false, 'ALL', false),
-('ipv6',   'IPv6 redirect',              'IPV6',      '%SUB% IN AAAA %TARGET%',                   'ip,ipv6,txt,mx,mx2,defmx,defmx2',           true,     true,     true,  'ALL', false),
+('vhost-http','Locally hosted with http->https',   'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',      'txt,dkim,defmx,defmx2,mx,mx2',                   false,    false,    false, 'NONE', false),
+('vhost-https','Locally hosted with http->https',   'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',      'txt,dkim,defmx,defmx2,mx,mx2',                   false,    false,    false, 'NONE', false),
+('vhost-both', 'Locally hosted with http and https', 'DIRECTORY', '%SUB% IN A @@PUBLIC_IP@@',     'txt,dkim,defmx,defmx2,mx,mx2',                   false,    false,    false, 'NONE', false),
+('url',    'URL redirection',            'URL',       '%SUB% IN A @@PUBLIC_IP@@',                 'txt,dkim,defmx,defmx2,mx,mx2',                   false,    false,    false, 'ALL', false),
+('ip',     'IPv4 redirect',              'IP',        '%SUB% IN A %TARGET%',                      'url,ip,ipv6,txt,dkim,mx,mx2,defmx,defmx2',       true,     true,     false, 'ALL', false),
+('ipv6',   'IPv6 redirect',              'IPV6',      '%SUB% IN AAAA %TARGET%',                   'ip,ipv6,txt,dkim,mx,mx2,defmx,defmx2',           true,     true,     true,  'ALL', false),
 ('cname',  'CNAME DNS entry',            'DOMAIN',    '%SUB% CNAME %TARGET%',                     '',                                          true,     true,     true,  'ALL', false),
-('txt',    'TXT DNS entry',              'TXT',       '%SUB% IN TXT "%TARGET%"',                  'vhost,url,ip,ipv6,txt,mx,mx2,defmx,defmx2', true,     true,     true,  'ALL', false),
-('mx',     'MX DNS entry',               'DOMAIN',    '%SUB% IN MX 5 %TARGET%',                   'vhost,url,ip,ipv6,txt,mx,mx2',              true,     true,     true,  'ALL', false),
-('mx2',    'secondary MX DNS entry',     'DOMAIN',    '%SUB% IN MX 10 %TARGET%',                  'vhost,url,ip,ipv6,txt,mx,mx2',              true,     true,     true,  'ALL', false),
-('defmx',  'Default mail server',        'NONE',      '%SUB% IN MX 5 @@DEFAULT_MX@@.',            'vhost,url,ip,ipv6,txt,defmx2',              true,     true,     true,  'ADMIN', false),
-('defmx2', 'Default backup mail server', 'NONE',      '%SUB% IN MX 10 @@DEFAULT_SECONDARY_MX@@.', 'vhost,url,ip,ipv6,txt,defmx',               true,     true,     true,  'ADMIN', false),
-('panel',  'AlternC panel access',       'NONE',      '%SUB% IN A @@PUBLIC_IP@@',                 'vhost,url,ip,ipv6,txt,mx,mx2,defmx,defmx2', false,    false,    true,  'ALL', false)
+('txt',    'TXT DNS entry',              'TXT',       '%SUB% IN TXT "%TARGET%"',                  'vhost,url,ip,ipv6,txt,dkim,mx,mx2,defmx,defmx2', true,     true,     true,  'ALL', false),
+('mx',     'MX DNS entry',               'DOMAIN',    '%SUB% IN MX 5 %TARGET%',                   'vhost,url,ip,ipv6,txt,dkim,mx,mx2',              true,     true,     true,  'ALL', false),
+('mx2',    'secondary MX DNS entry',     'DOMAIN',    '%SUB% IN MX 10 %TARGET%',                  'vhost,url,ip,ipv6,txt,dkim,mx,mx2',              true,     true,     true,  'ALL', false),
+('defmx',  'Default mail server',        'NONE',      '%SUB% IN MX 5 @@DEFAULT_MX@@.',            'vhost,url,ip,ipv6,txt,dkim,defmx2',              true,     true,     true,  'ADMIN', false),
+('defmx2', 'Default backup mail server', 'NONE',      '%SUB% IN MX 10 @@DEFAULT_SECONDARY_MX@@.', 'vhost,url,ip,ipv6,txt,dkim,defmx',               true,     true,     true,  'ADMIN', false),
+('panel',  'AlternC panel access',       'NONE',      '%SUB% IN A @@PUBLIC_IP@@',                 'vhost,url,ip,ipv6,txt,dkim,mx,mx2,defmx,defmx2', false,    false,    true,  'ALL', false)
 ;
 UPDATE domaines_type SET create_tmpdir=true, create_targetdir=true WHERE target='DIRECTORY';
 
@@ -766,7 +766,7 @@ CREATE TABLE IF NOT EXISTS `actions` (
  begin timestamp,
  end timestamp,
  user varchar(255) default NULL,
- status int(8) unsigned default NULL,
+ status int(8) signed default NULL,
  PRIMARY KEY ( `id` )
 ) ENGINE=InnoDB COMMENT = 'generic actions';
 

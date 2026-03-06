@@ -12,22 +12,38 @@ while ($db->next_record()) {
     $add[$db->Record["domaine"]]=$db->Record["compte"];
 }
 foreach($add as $domain => $id) {
+    // Delete previous dkim key (prevent duplicate or truncated row)
+    $db->query("DELETE FROM sub_domaines
+        WHERE compte=? AND domaine=? AND sub='alternc._domainkey' AND type='dkim';",
+        array($id, $domain)
+    );
+    $db->query("DELETE FROM sub_domaines
+        WHERE compte=? AND domaine=? AND type='autodiscover';",
+        array($id, $domain)
+    );
+
     // Convert DKIM keys into SUB_DOMAINES table
     if (file_exists("/etc/opendkim/keys/".$domain."/alternc.txt")) {
         $dkim_key = $mail->dkim_get_entry($domain);
         if ($dkim_key) {
             // Add subdomain dkim entry
             $db->query("INSERT INTO sub_domaines 
-        SET compte=?, domaine=?, sub='@', valeur=?, type='dkim', web_action='OK', web_result=0, enable='ENABLED';",
+        SET compte=?, domaine=?, sub='alternc._domainkey', valeur=?, type='dkim', web_action='OK', web_result=0, enable='ENABLED';",
             array($id, $domain, $dkim_key)
             );
             // Alternc.INSTALL WILL reload DNS zones anyway, so fear not we don't set dns_action="RELOAD" here.
         }
     }
     // Convert autodiscover into SUB_DOMAINES table
-    $db->query("INSERT INTO sub_domaines 
-    SET compte=?, domaine=?, sub='@', valeur='', type='autodiscover', web_action='UPDATE', web_result=0, enable='ENABLED';",
-    array($id, $domain)
-    );    
+    $db->query("INSERT INTO sub_domaines
+        SET compte=?, domaine=?, sub='autodiscover', valeur='', type='autodiscover', web_action='UPDATE', web_result=0, enable='ENABLED';",
+        array($id, $domain)
+    );
+
+    // Convert autodiscover into SUB_DOMAINES table
+    $db->query("INSERT INTO sub_domaines
+        SET compte=?, domaine=?, sub='autoconfig', valeur='', type='autodiscover', web_action='UPDATE', web_result=0, enable='ENABLED';",
+        array($id, $domain)
+    );
 }
 

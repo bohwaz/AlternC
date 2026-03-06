@@ -62,8 +62,10 @@ class DB_Sql {
 
         $dsn = sprintf('mysql:dbname=%s;host=%s', $db, $host);
 
+        //Force same behavior between php 5.x and php 8.x
+        //https://www.php.net/manual/en/pdo.error-handling.php
         $options=array(
-//            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_WARNING
         );
         try {
             $this->pdo_instance = new PDO($dsn, $user, $passwd, $options);
@@ -272,7 +274,7 @@ class DB_Sql {
     
         $query="lock tables ";
         if (is_array($table)) {
-            while (list($key,$value)=each($table)) {
+            foreach($table as $key=>$value) {
                 if ($key=="read" && $key!=0) {
                     $query.="$value read, ";
                 } else {

@@ -75,7 +75,7 @@ class m_dom {
     /**
      * Constructeur
      */
-    function m_dom() {
+    function __construct() {
         global $L_FQDN, $domislocked;
         $this->tld_no_check_at_all = variable_get('tld_no_check_at_all', 0, 'Disable ALL check on the TLD (users will be able to add any domain)', array('desc' => 'Disabled', 'type' => 'boolean'));
         variable_get('mailname_bounce', $L_FQDN, 'FQDN of the mail server, used to create vhost virtual mail_adress.', array('desc' => 'FQDN', 'type' => 'string'));
@@ -346,7 +346,8 @@ class m_dom {
                             // Examples:
                             // agenda IN CNAME ghs.google.com.
                             // www 3600 IN CNAME @
-                            if (preg_match('/^(?P<sub>[\-\w\.@]*)\h*(?P<ttl>\d*)\h*IN\h+CNAME\h+(?P<target>[@\w+\.\-]+)/i', $zone, $ret)) {
+                            // foo CNAME bar.example.com.
+                            if (preg_match('/^(?P<sub>[\-\w\.@]*)\h*(?P<ttl>\d*)\h*(IN)?\h+CNAME\h+(?P<target>[@\w+\.\-]+)/i', $zone, $ret)) {
                                 if (substr($ret['sub'], -1) == '.') { // if ending by a "." it is allready a FQDN
                                     $url = "http://" . $ret['sub'];
                                 } else {
@@ -550,7 +551,7 @@ class m_dom {
     function domains_type_update($name, $description, $target, $entry, $compatibility, $enable, $only_dns, $need_dns, $advanced, $create_tmpdir, $create_targetdir,$has_https_option=0) {
         global $msg, $db;
         // The name MUST contain only letter and digits, it's an identifier after all ...
-        if (!preg_match("#^[a-z0-9]+$#", $name)) {
+        if (!preg_match("#^[a-z0-9-]+$#", $name)) {
             $msg->raise("ERROR", "dom", _("The name MUST contain only letter and digits"));
             return false;
         }
@@ -745,7 +746,7 @@ class m_dom {
                 $dns = "0";
             }
             // mode 5 : force DNS to NO.
-            if ($tld[$v] == 5) {
+            if (isset($tld[$v]) && $tld[$v] == 5) {
                 $dns = 0;
             }
             // It must be a real domain (no subdomain)

@@ -219,7 +219,7 @@ class m_aws {
   function select_prefix_list($current) {
     $r=$this->prefix_list();
     reset($r);
-    while (list($key,$val)=each($r)) {
+    foreach($r as $val) {
       if ($current==$val) $c=" selected=\"selected\""; else $c="";
       echo "<option$c>$val</option>";
     }
@@ -234,8 +234,7 @@ class m_aws {
    */
   function select_host_list($current) {
     $r=$this->host_list();
-    reset($r);
-    while (list($key,$val)=each($r)) {
+    foreach($r as $key=>$val) {
       $ho=$val["hostname"];
       $ty=$val["desc"];
       if ($current==$ho) $c=" selected=\"selected\""; else $c="";
@@ -256,7 +255,7 @@ class m_aws {
     $r=$this->get_list();
     if(is_array($r)){
         reset($r);
-        while (list($key,$val)=each($r)) {
+        foreach($r as $key=>$val) {
           if ($current==$val["hostname"]) {
               $msg->raise('Alert', "aws",_("Host already managed by awstats!"));
               return false;
@@ -815,7 +814,7 @@ class m_aws {
     $text = $plainpasswd.'$apr1$'.$salt;
     $bin = pack("H32", md5($plainpasswd.$salt.$plainpasswd));
     for($i = $len; $i > 0; $i -= 16) { $text .= substr($bin, 0, min(16, $i)); }
-    for($i = $len; $i > 0; $i >>= 1) { $text .= ($i & 1) ? chr(0) : $plainpasswd{0}; }
+    for($i = $len; $i > 0; $i >>= 1) { $text .= ($i & 1) ? chr(0) : substr($plainpasswd,0,1); }
     $bin = pack("H32", md5($text));
     for($i = 0; $i < 1000; $i++) {
       $new = ($i & 1) ? $plainpasswd : $bin;

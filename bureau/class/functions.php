@@ -271,8 +271,7 @@ function checkfqdn($fqdn) {
     } else {
         $ret = 4;
     }
-    reset($members);
-    while (list ($key, $val) = each($members)) {
+    foreach($members as $val) {
         if (strlen($val) > 63) {
             return 2;
         }
@@ -508,20 +507,6 @@ function format_date($format, $date) {
     // we want every number to be treated as a string.
     $format=str_replace('$d', '$s', $format);
     return sprintf($format, $d, $m, $y, $h, $i, $hh, $am);
-}
-
-
-/**
- * Strip slashes if needed : 
- * @param string $str
- * @return string
- */
-function ssla($str) {
-    if (get_magic_quotes_gpc()) {
-        return stripslashes($str);
-    } else {
-        return $str;
-    }
 }
 
 
@@ -1159,12 +1144,25 @@ function panel_islocked() {
 function csrf_get($return=false) {
     global $db;
     static $token="";
+    $token_attempts = 0;
+    $token_max_attempts = 5;
     if (!isset($_SESSION["csrf"])) {
         $_SESSION["csrf"]=md5(mt_rand().mt_rand().mt_rand());
     }
     if ($token=="") {
-        $token=md5(mt_rand().mt_rand().mt_rand());
-        $db->query("INSERT INTO csrf SET cookie=?, token=?, created=NOW(), used=0;",array($_SESSION["csrf"],$token));
+        do {
+            //Prevent colission token
+            try {
+                $token=md5(mt_rand().mt_rand().mt_rand());
+                if (!$db->query("INSERT INTO csrf SET cookie=:csrf, token=:token, created=NOW(), used=0;",array("csrf" => $_SESSION["csrf"], "token" => $token))) {
+                  echo(print_r($db->last_error(),1));
+                }
+            } catch (Exception $e) {
+                $token_attempts++;
+                continue;
+            }
+            break;
+        } while($token_attempts < $token_max_attempts);
     }
     if ($return) 
         return $token;
